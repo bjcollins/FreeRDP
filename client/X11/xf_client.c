@@ -1671,6 +1671,11 @@ void xf_ScalingFactorChangeEventHandler(rdpContext* context, ScalingFactorChange
 void xfreerdp_client_global_init()
 {
 	setlocale(LC_ALL, "");
+
+	// This allows X calls to be made from different threads
+	// used for thread safety when using tsmf/gstreamer
+	XInitThreads();
+
 	freerdp_handle_signals();
 	freerdp_channels_global_init();
 }

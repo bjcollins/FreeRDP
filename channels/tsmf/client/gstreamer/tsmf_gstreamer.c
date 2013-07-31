@@ -230,13 +230,13 @@ static int tsmf_gstreamer_pipeline_set_state(TSMFGstreamerDecoder * mdecoder, Gs
 				DEBUG_DVC("tsmf_gstreamer_pipeline_set_state(%s) Waiting - current %s pending %s.", name, current_name, pending_name);
 
 				usleep(10000);
-                        	timeout--;
-                        	if (timeout <= 0)
-                        	{
-                                	DEBUG_WARN("tsmf_gstreamer_pipeline_set_state: TIMED OUT - failed to change state");
-                                	keep_waiting = 0;
-                                	break;
-                        	}
+				timeout--;
+				if (timeout <= 0)
+				{
+					DEBUG_WARN("tsmf_gstreamer_pipeline_set_state: TIMED OUT - failed to change state");
+					keep_waiting = 0;
+					break;
+				}
 			}
 		}
 		else
@@ -914,10 +914,12 @@ static BOOL tsmf_gstreamer_pipeline_build(TSMFGstreamerDecoder * mdecoder)
 
 				if (!mdecoder->subwin)
 				{
+					XLockDisplay(mdecoder->disp);
 					mdecoder->subwin = XCreateSimpleWindow(mdecoder->disp, *mdecoder->xfwin, 0, 0, 1, 1, 0, 0, 0);
 					XMapWindow(mdecoder->disp, mdecoder->subwin);
 					mdecoder->subwinMapped = TRUE;
 					XSync(mdecoder->disp, FALSE);
+					XUnlockDisplay(mdecoder->disp);
 				}
 			}
 			mdecoder->aVolume = 0;
@@ -1033,11 +1035,11 @@ static BOOL tsmf_gstreamer_pipeline_build(TSMFGstreamerDecoder * mdecoder)
 	{
 		if(mdecoder->subwin)
 		{
-			//gdk_threads_enter();
+			XLockDisplay(mdecoder->disp);
 			// gst_overlay_set_xwindow_id was deprecated, so using gst_x_overlay_set_window_handle instead
 			//gst_x_overlay_set_xwindow_id (GST_X_OVERLAY (mdecoder->outsink), mdecoder->subwin);
 			gst_x_overlay_set_window_handle (GST_X_OVERLAY (mdecoder->outsink), mdecoder->subwin);
-			//gdk_threads_leave();
+			XUnlockDisplay(mdecoder->disp);
 		}
 	}
 
@@ -1346,9 +1348,11 @@ static BOOL tsmf_gstreamer_decodeEx(ITSMFDecoder * decoder, const BYTE * data, U
 			// Remap the window here if needed
 			if ((mdecoder->subwin) && (!mdecoder->subwinMapped))
 			{
+				XLockDisplay(mdecoder->disp);
 				XMapWindow(mdecoder->disp, mdecoder->subwin);
 				XSync(mdecoder->disp, FALSE);
 				mdecoder->subwinMapped = TRUE;
+				XUnlockDisplay(mdecoder->disp);
 			}
 			tsmf_gstreamer_pipeline_set_state(mdecoder, GST_STATE_PLAYING);
 		}
@@ -1407,9 +1411,11 @@ static void tsmf_gstreamer_control(ITSMFDecoder * decoder, ITSMFControlMsg contr
 		// Only need to map the window if it is not currently mapped
 		if ((mdecoder->subwin) && (!mdecoder->subwinMapped))
 		{
+			XLockDisplay(mdecoder->disp);
 			XMapWindow(mdecoder->disp, mdecoder->subwin);
 			mdecoder->subwinMapped = TRUE;
 			XSync(mdecoder->disp, FALSE);
+			XUnlockDisplay(mdecoder->disp);
 		}
 
 		if (mdecoder->pipeline_start_time_valid)
@@ -1433,9 +1439,11 @@ static void tsmf_gstreamer_control(ITSMFDecoder * decoder, ITSMFControlMsg contr
 		// Only need to unmap window if it is currently mapped
 		if ((mdecoder->subwin) && (mdecoder->subwinMapped))
 		{
+			XLockDisplay(mdecoder->disp);
 			XUnmapWindow(mdecoder->disp, mdecoder->subwin);
 			XSync(mdecoder->disp, FALSE);
 			mdecoder->subwinMapped = FALSE;
+			XUnlockDisplay(mdecoder->disp);
 		}
 	}
 	else if (control_msg == Control_EndOfStream) 
@@ -1550,6 +1558,8 @@ static void tsmf_gstreamer_update_rendering_area(ITSMFDecoder * decoder, int new
 		if (!mdecoder->disp)
 			mdecoder->disp = XOpenDisplay(NULL);
 
+		XLockDisplay(mdecoder->disp);
+
 		//multi-mon test
 		int anewX = newX;
 		int anewY = newY;
@@ -1615,6 +1625,7 @@ static void tsmf_gstreamer_update_rendering_area(ITSMFDecoder * decoder, int new
 			XSync(mdecoder->disp, FALSE);
 		}
 		gst_x_overlay_expose (GST_X_OVERLAY (mdecoder->outsink));
+		XUnlockDisplay(mdecoder->disp);
 	}
 }
 
@@ -1684,8 +1695,6 @@ ITSMFDecoder* freerdp_tsmf_client_decoder_subsystem_entry(void)
 	{
 		decoder->xfwin = shmat(shmid, NULL, 0);
 	}
-
-	XInitThreads();
 
 	return (ITSMFDecoder *) decoder;
 }
