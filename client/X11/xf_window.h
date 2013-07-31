@@ -80,6 +80,8 @@ struct xf_window
 	xfLocalMove local_move;
 	BYTE rail_state;
 	BOOL rail_ignore_configure;
+	int shmid;
+	int *xfwin;
 };
 
 void xf_ewmhints_init(xfContext* xfc);

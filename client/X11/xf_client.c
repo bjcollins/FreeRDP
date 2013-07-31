@@ -100,6 +100,8 @@
 static long xv_port = 0;
 static const size_t password_size = 512;
 
+static int terminating = 0;
+
 void xf_transform_window(xfContext* xfc)
 {
 	int ret;
@@ -1392,6 +1394,12 @@ void* xf_thread(void* param)
 		rcount = 0;
 		wcount = 0;
 
+		if (terminating)
+		{
+			printf("Got process termination signal - do cleanup.\n");
+			break;
+		}
+
 		if (freerdp_focus_required(instance))
 		{
 			xf_kbd_focus_in(xfc);
@@ -1520,21 +1528,26 @@ void* xf_thread(void* param)
 		CloseHandle(update_thread);
 	}
 
-	FILE* fin = fopen("/tmp/tsmf.tid", "rt");
+	char filename[4096] = "";
+	snprintf(filename, 4096, "/tmp/tsmf-%i.tid", getpid());
+	FILE* fin = fopen(filename, "rt");
 
 	if (fin)
 	{
 		FILE* fin1;
-		int thid = 0;
-		int timeout;
-
-		fscanf(fin, "%d", &thid);
+		pthread_t thid = 0;
+		int timeout = 5;
+		
+		printf("Trying to lookup tsmf tid information to kill it!\n");
+		fscanf(fin, "%lu", &thid);
 		fclose(fin);
 
+		printf("Attempting to kill tsmf thread with SIGUSR1\n");
 		pthread_kill((pthread_t) (size_t) thid, SIGUSR1);
 
-		fin1 = fopen("/tmp/tsmf.tid", "rt");
-		timeout = 5;
+		printf("Waiting for tsmf thread to die\n");
+		sleep(1);
+		fin1 = fopen(filename, "rt");
 
 		while (fin1)
 		{
@@ -1544,12 +1557,13 @@ void* xf_thread(void* param)
 
 			if (timeout <= 0)
 			{
-				unlink("/tmp/tsmf.tid");
+				printf("tsmf thread has not died on its own - so kill it!\n");
+				unlink(filename);
 				pthread_kill((pthread_t) (size_t) thid, SIGKILL);
 				break;
 			}
 
-			fin1 = fopen("/tmp/tsmf.tid", "rt");
+			fin1 = fopen(filename, "rt");
 		}
 	}
 
@@ -1560,6 +1574,12 @@ void* xf_thread(void* param)
 	freerdp_channels_free(channels);
 	freerdp_disconnect(instance);
 	gdi_free(instance);
+
+	if (terminating)
+	{
+		printf("Completed process cleanup due to termination signal\n");
+		terminating = 0;
+	}
 
 	ExitThread(exit_code);
 
@@ -1676,7 +1696,7 @@ void xfreerdp_client_global_init()
 	// used for thread safety when using tsmf/gstreamer
 	XInitThreads();
 
-	freerdp_handle_signals();
+	freerdp_handle_signals(&terminating);
 	freerdp_channels_global_init();
 }
 

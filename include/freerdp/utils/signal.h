@@ -35,7 +35,11 @@ extern struct termios new_flags;
 extern "C" {
 #endif
 
+#ifndef _WIN32
+FREERDP_API int freerdp_handle_signals(int *terminating);
+#else
 FREERDP_API int freerdp_handle_signals(void);
+#endif
 
 #ifdef __cplusplus
 }

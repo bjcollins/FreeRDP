@@ -340,10 +340,11 @@ xfWindow* xf_CreateDesktopWindow(xfContext* xfc, char* name, int width, int heig
 
 	if (window)
 	{
-		int shmid;
 		int input_mask;
 		XClassHint* class_hints;
 
+		window->shmid = -1;
+		window->xfwin = -1;
 		window->width = width;
 		window->height = height;
 		window->fullscreen = FALSE;
@@ -357,23 +358,23 @@ xfWindow* xf_CreateDesktopWindow(xfContext* xfc, char* name, int width, int heig
 			CWBackPixel | CWBackingStore | CWOverrideRedirect | CWColormap | 
 			CWBorderPixel | CWWinGravity | CWBitGravity, &xfc->attribs);
 
-		shmid = shmget(SHARED_MEM_KEY, sizeof(int), IPC_CREAT | 0666);
+		window->shmid = shmget(SHARED_MEM_KEY + getpid(), sizeof(int), IPC_CREAT | 0666);
 
-		if (shmid < 0)
+		if (window->shmid < 0)
 		{
 			DEBUG_X11("xf_CreateDesktopWindow: failed to get access to shared memory - shmget()\n");
 		}
 		else
 		{
-			int* xfwin = shmat(shmid, NULL, 0);
+			window->xfwin = shmat(window->shmid, NULL, 0);
 
-			if (xfwin == (int*) -1)
+			if (window->xfwin == (int*) -1)
 			{
 				DEBUG_X11("xf_CreateDesktopWindow: failed to assign pointer to the memory address - shmat()\n");
 			}
 			else
 			{
-				*xfwin = (int) window->handle;
+				*(window->xfwin) = (int) window->handle;
 			}
 		}
 
@@ -514,6 +515,9 @@ xfWindow* xf_CreateWindow(xfContext* xfc, rdpWindow* wnd, int x, int y, int widt
 	ZeroMemory(window, sizeof(xfWindow));
 
 	xf_FixWindowCoordinates(xfc, &x, &y, &width, &height);
+
+	window->shmid = -1;
+	window->xfwin = -1;
 
 	window->left = x;
 	window->top = y;
@@ -973,6 +977,17 @@ void xf_DestroyWindow(xfContext* xfc, xfWindow* window)
 
 	if (window->handle)
 	{
+		if (window->xfwin != -1)
+		{
+			shmdt(window->xfwin);
+			window->xfwin = -1;
+		}
+		if (window->shmid >= 0)
+		{
+			shmctl(window->shmid, IPC_RMID, NULL);
+			window->shmid = -1;
+		}
+
 		XUnmapWindow(xfc->display, window->handle);
 		XDestroyWindow(xfc->display, window->handle);
 	}

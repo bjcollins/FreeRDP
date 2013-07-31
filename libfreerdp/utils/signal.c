@@ -39,10 +39,15 @@ int freerdp_handle_signals(void)
 
 #elif !defined(ANDROID)
 
+#include <unistd.h>
+#include <stdio.h>
+
 volatile sig_atomic_t terminal_needs_reset = 0;
 int terminal_fildes = 0;
 struct termios orig_flags;
 struct termios new_flags;
+
+static int *terminating_flag;
 
 static void fatal_handler(int signum)
 {
@@ -61,6 +66,29 @@ static void fatal_handler(int signum)
 	sigemptyset(&this_mask);
 	sigaddset(&this_mask, signum);
 	pthread_sigmask(SIG_UNBLOCK, &this_mask, NULL);
+
+	// For a SIGTERM - we try to exit the application gracefully
+	// to exit the application cleanly - we allow 5 seconds for 
+	// this to happen before raising the signal
+	if (signum == SIGTERM)
+	{
+		int timeout = 10; // it may take up to 5 seconds for main process to even see flag is set
+		printf("Setting process terminating flag.\n");
+		*terminating_flag = 1;
+
+		while (*terminating_flag == 1)
+		{
+			sleep(1);
+			timeout--;
+
+			if (timeout <= 0)
+			{
+				printf("Process has failed to respond to the terminating flag before %i seconds timeout, raising signal anyways", timeout);
+				break;
+			}
+		}
+	}
+
 	raise(signum);
 }
 
@@ -101,12 +129,14 @@ const int fatal_signals[] =
 	SIGXFSZ
 };
 
-int freerdp_handle_signals(void)
+int freerdp_handle_signals(int *terminating)
 {
 	int signal_index;
 	sigset_t orig_set;
 	struct sigaction orig_sigaction;
 	struct sigaction fatal_sigaction;
+
+	terminating_flag = terminating;
 
 	sigfillset(&(fatal_sigaction.sa_mask));
 	sigdelset(&(fatal_sigaction.sa_mask), SIGCONT);

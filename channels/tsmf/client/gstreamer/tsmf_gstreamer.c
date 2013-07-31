@@ -1736,6 +1736,11 @@ static void tsmf_gstreamer_free(ITSMFDecoder * decoder)
 		audio_ready = FALSE;
 
 		pthread_mutex_unlock(&mdecoder->gst_mutex);
+		pthread_mutex_destroy(&mdecoder->gst_mutex);
+
+		if (mdecoder->xfwin)
+			shmdt(mdecoder->xfwin);
+
 		free(mdecoder);
 		mdecoder = 0;
 	}
@@ -1902,7 +1907,7 @@ ITSMFDecoder* freerdp_tsmf_client_decoder_subsystem_entry(void)
 	decoder->state = GST_STATE_VOID_PENDING;  /* No real state yet */
 	pthread_mutex_init(&decoder->gst_mutex, NULL);
 
-	int shmid = shmget(SHARED_MEM_KEY, sizeof(int), 0666);
+	int shmid = shmget(SHARED_MEM_KEY + getpid(), sizeof(int), 0666);
 	if (shmid < 0)
 	{
 		DEBUG_WARN("tsmf_gstreamer_entry: failed to get access to shared memory - shmget()");

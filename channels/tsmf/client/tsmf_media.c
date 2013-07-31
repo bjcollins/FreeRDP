@@ -266,12 +266,14 @@ TSMF_PRESENTATION* tsmf_presentation_new(const BYTE* guid, IWTSVirtualChannelCal
 {
 	TSMF_PRESENTATION* presentation;
 	pthread_t thid = pthread_self();
+	char filename[4096] = "";
+	snprintf(filename, 4096, "/tmp/tsmf-%i.tid", getpid());
 	FILE* fout = NULL;
-	fout = fopen("/tmp/tsmf.tid", "wt");
+	fout = fopen(filename, "wt");
 	
 	if (fout)
 	{
-		fprintf(fout, "%d\n", (int) (size_t) thid);
+		fprintf(fout, "%lu\n", (unsigned long) (size_t) thid);
 		fclose(fout);
 	}
 
@@ -969,6 +971,10 @@ void tsmf_presentation_free(TSMF_PRESENTATION* presentation)
 
 	CloseHandle(presentation->mutex);
 
+	char filename[4096] = "";
+	snprintf(filename, 4096, "/tmp/tsmf-%i.tid", getpid());
+	unlink(filename);
+
 	free(presentation);
 }
 
@@ -1110,6 +1116,10 @@ void tsmf_stream_free(TSMF_STREAM* stream)
 		stream->decoder = 0;
 	}
 
+	WaitForSingleObject(tsmf_mutex, INFINITE);
+	ReleaseMutex(tsmf_mutex);
+	CloseHandle(tsmf_mutex);
+
 	SetEvent(stream->thread);
 
 	free(stream);
@@ -1182,19 +1192,12 @@ static void tsmf_signal_handler(int s)
 
 	if (presentation_list)
 	{
-		for (p_item = presentation_list->head; p_item; p_item = p_item->next)
+		for (p_item = presentation_list->head; p_item; p_item = presentation_list->head)
 		{
 			presentation = (TSMF_PRESENTATION*) p_item->data;
-			for (s_item = presentation->stream_list->head; s_item; s_item = s_item->next)
-			{
-				_stream = (TSMF_STREAM*) s_item->data;
-				tsmf_stream_free(_stream);
-			}
 			tsmf_presentation_free(presentation);
 		}
 	}
-
-	unlink("/tmp/tsmf.tid");
 
 	if (s == SIGINT)
 	{
