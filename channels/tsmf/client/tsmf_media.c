@@ -120,6 +120,7 @@ struct _TSMF_STREAM
 	UINT64 next_start_time;
 
 	BOOL started;
+	BOOL thread_completed;
 
 	HANDLE thread;
 	HANDLE stopEvent;
@@ -718,6 +719,8 @@ static void* tsmf_stream_playback_func(void* arg)
 
 	DEBUG_DVC("out %d", stream->stream_id);
 
+	stream->thread_completed = TRUE;
+
 	return NULL;
 }
 
@@ -728,6 +731,13 @@ static void tsmf_stream_start(TSMF_STREAM* stream)
 
 	if (!stream->started)
 	{
+		if (stream->thread_completed)
+		{
+			stream->thread_completed = FALSE;
+			ResetEvent(stream->stopEvent);
+			stream->thread = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE) tsmf_stream_playback_func, stream, CREATE_SUSPENDED, NULL);
+		}
+
 		ResumeThread(stream->thread);
 		stream->started = TRUE;
 	}
