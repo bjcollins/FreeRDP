@@ -74,6 +74,7 @@ typedef struct _TSMFGstreamerDecoder
 	GstElement *outconv;
 	GstElement *outsink;
 	GstElement *aVolume;
+	GstElement *aResample;
 
 	BOOL paused;
 	UINT64 last_sample_end_time;
@@ -680,6 +681,9 @@ static void tsmf_gstreamer_clean_up(TSMFGstreamerDecoder * mdecoder, BOOL do_unr
 
 		if (mdecoder->aVolume)
 			gst_object_unref(mdecoder->aVolume);
+
+		if (mdecoder->aResample)
+                        gst_object_unref(mdecoder->aResample);
 	}
 
 	mdecoder->src = NULL;
@@ -689,6 +693,7 @@ static void tsmf_gstreamer_clean_up(TSMFGstreamerDecoder * mdecoder, BOOL do_unr
 	mdecoder->outconv = NULL;
 	mdecoder->outsink = NULL;
 	mdecoder->aVolume = NULL;
+	mdecoder->aResample = NULL;
 }
 
 
@@ -922,15 +927,18 @@ static BOOL tsmf_gstreamer_pipeline_build(TSMFGstreamerDecoder * mdecoder)
 					XUnlockDisplay(mdecoder->disp);
 				}
 			}
-			mdecoder->aVolume = 0;
+			mdecoder->aVolume = NULL;
+			mdecoder->aResample = NULL;
 			break;
 		}
 		case TSMF_MAJOR_TYPE_AUDIO:
 		{
 			mdecoder->outbin = gst_bin_new ("audiobin"); 
 			mdecoder->outconv = gst_element_factory_make ("audioconvert", "aconv"); 
-			mdecoder->outsink = gst_element_factory_make ("alsasink", NULL); 
-			mdecoder->aVolume = gst_element_factory_make ("volume", "AudioVol");
+			mdecoder->outsink = gst_element_factory_make ("alsasink", "audiosink"); 
+			mdecoder->aVolume = gst_element_factory_make ("volume", "aVolume");
+			mdecoder->aResample = gst_element_factory_make ("audioresample", "aResample");
+
 			if (mdecoder->aVolume)
 			{
 				g_object_set(mdecoder->aVolume, "mute", mdecoder->gstMuted, NULL);
@@ -994,7 +1002,14 @@ static BOOL tsmf_gstreamer_pipeline_build(TSMFGstreamerDecoder * mdecoder)
 	if (mdecoder->aVolume)
 	{
 		gst_bin_add(GST_BIN(mdecoder->outbin), mdecoder->aVolume);
-		linkResult = gst_element_link_many(mdecoder->outconv, mdecoder->aVolume, mdecoder->outsink, NULL);
+
+		if (mdecoder->aResample)
+		{
+			gst_bin_add(GST_BIN(mdecoder->outbin), mdecoder->aResample);
+			linkResult = gst_element_link_many(mdecoder->outconv, mdecoder->aResample, mdecoder->aVolume, mdecoder->outsink, NULL);
+		}
+		else
+			linkResult = gst_element_link_many(mdecoder->outconv, mdecoder->aVolume, mdecoder->outsink, NULL);
 	}
 	else
 	{
@@ -1364,25 +1379,42 @@ static BOOL tsmf_gstreamer_decodeEx(ITSMFDecoder * decoder, const BYTE * data, U
 static void tsmf_gstreamer_change_volume(ITSMFDecoder * decoder, UINT32 newVolume, UINT32 muted)
 {
 	TSMFGstreamerDecoder * mdecoder = (TSMFGstreamerDecoder *) decoder;
+	
 	if (!mdecoder)
+	{
+		DEBUG_DVC("Unable to set audio as the decoder has not been initialized.");
 		return;
+	}
 
 	if (mdecoder->shutdown)
+	{
+		DEBUG_DVC("Shutdown active - unable to change volume.");
 		return;
+	}
 
 	if (mdecoder->media_type == TSMF_MAJOR_TYPE_VIDEO)
+	{
+		DEBUG_DVC("Media type is video - unable to change volume.");
 		return;
+	}
 
 	mdecoder->gstMuted = (BOOL) muted;
 	DEBUG_DVC("tsmf_gstreamer_change_volume: mute=[%d]", mdecoder->gstMuted);
 	mdecoder->gstVolume = (double) newVolume / (double) 10000;
 	DEBUG_DVC("tsmf_gstreamer_change_volume: gst_new_vol=[%f]", mdecoder->gstVolume);
 
+	DEBUG_DVC("Local volume updated, trying to set to gstreamer pipeline.");
 	if (!mdecoder->aVolume)
+	{
+		DEBUG_DVC("Pipeline currently has no suitable volume control. New volume parameters will be used once initialized.");
 		return;
+	}
 
 	if (!G_IS_OBJECT(mdecoder->aVolume))
+	{
+		DEBUG_DVC("Error setting pipeline volume.");
 		return;
+	}
 
 	g_object_set(mdecoder->aVolume, "mute", mdecoder->gstMuted, NULL);
 	g_object_set(mdecoder->aVolume, "volume", mdecoder->gstVolume, NULL);
