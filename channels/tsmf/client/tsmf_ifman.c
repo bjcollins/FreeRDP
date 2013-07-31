@@ -505,6 +505,7 @@ int tsmf_ifman_on_flush(TSMF_IFMAN* ifman)
 {
 	UINT32 StreamId;
 	TSMF_PRESENTATION* presentation;
+	TSMF_STREAM* stream;
 
 	Stream_Seek(ifman->input, 16);
 	Stream_Read_UINT32(ifman->input, StreamId);
@@ -518,7 +519,11 @@ int tsmf_ifman_on_flush(TSMF_IFMAN* ifman)
 		return 1;
 	}
 
-	tsmf_presentation_flush(presentation);
+	stream = tsmf_stream_find_by_id(presentation, StreamId);
+	if (stream)
+		tsmf_stream_flush(stream);
+	else
+		DEBUG_WARN("unknown stream id");
 
 	ifman->output_pending = TRUE;
 

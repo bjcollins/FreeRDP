@@ -723,10 +723,25 @@ static void* tsmf_stream_playback_func(void* arg)
 
 static void tsmf_stream_start(TSMF_STREAM* stream)
 {
+	if (!stream)
+                return;
+
 	if (!stream->started)
 	{
 		ResumeThread(stream->thread);
 		stream->started = TRUE;
+	}
+
+	//Sometimes a start is called after a flush, so handle this case like a restart
+	else
+	{
+		if (!stream->decoder)
+			return;
+
+		if (stream->decoder->Control)
+		{
+			stream->decoder->Control(stream->decoder, Control_Restart, NULL);
+		}
 	}
 }
 
@@ -744,6 +759,8 @@ static void tsmf_stream_stop(TSMF_STREAM* stream)
 		stream->started = FALSE;
 	}
 
+	tsmf_stream_flush(stream);
+
 	if (stream->decoder->Control)
 	{
 		stream->decoder->Control(stream->decoder, Control_Flush, NULL);
@@ -753,6 +770,9 @@ static void tsmf_stream_stop(TSMF_STREAM* stream)
 static void tsmf_stream_pause(TSMF_STREAM* stream)
 {
 	if (!stream)
+		return;
+
+	if (!stream->started)
 		return;
 
 	if (!stream->decoder)
@@ -767,6 +787,9 @@ static void tsmf_stream_pause(TSMF_STREAM* stream)
 static void tsmf_stream_restart(TSMF_STREAM* stream)
 {
 	if (!stream)
+		return;
+
+	if (!stream->started)
 		return;
 
 	if (!stream->decoder)
@@ -850,31 +873,11 @@ void tsmf_presentation_stop(TSMF_PRESENTATION* presentation)
 	LIST_ITEM* item;
 	TSMF_STREAM* stream;
 
-	tsmf_presentation_flush(presentation);
-
 	for (item = presentation->stream_list->head; item; item = item->next)
 	{
 		stream = (TSMF_STREAM*) item->data;
 		tsmf_stream_stop(stream);
 	}
-
-	tsmf_presentation_restore_last_video_frame(presentation);
-
-	if (presentation->last_rects)
-	{
-		free(presentation->last_rects);
-		presentation->last_rects = NULL;
-	}
-
-	presentation->last_num_rects = 0;
-
-	if (presentation->output_rects)
-	{
-		free(presentation->output_rects);
-		presentation->output_rects = NULL;
-	}
-
-	presentation->output_num_rects = 0;
 }
 
 void tsmf_presentation_set_geometry_info(TSMF_PRESENTATION* presentation,
@@ -898,7 +901,7 @@ void tsmf_presentation_set_audio_device(TSMF_PRESENTATION* presentation, const c
 	presentation->audio_device = device;
 }
 
-static void tsmf_stream_flush(TSMF_STREAM* stream)
+void tsmf_stream_flush(TSMF_STREAM* stream)
 {
 	//TSMF_SAMPLE* sample;
 
@@ -916,22 +919,26 @@ static void tsmf_stream_flush(TSMF_STREAM* stream)
 		stream->presentation->audio_start_time = 0;
 		stream->presentation->audio_end_time = 0;
 	}
-}
-
-void tsmf_presentation_flush(TSMF_PRESENTATION* presentation)
-{
-	LIST_ITEM* item;
-	TSMF_STREAM * stream;
-
-	for (item = presentation->stream_list->head; item; item = item->next)
+	else
 	{
-		stream = (TSMF_STREAM*) item->data;
-		tsmf_stream_flush(stream);
-	}
+		tsmf_presentation_restore_last_video_frame(stream->presentation);
+		
+		if (stream->presentation->last_rects)
+		{
+			free(stream->presentation->last_rects);
+			stream->presentation->last_rects = NULL;
+		}
 
-	presentation->eos = 0;
-	presentation->audio_start_time = 0;
-	presentation->audio_end_time = 0;
+		stream->presentation->last_num_rects = 0;
+
+		if (stream->presentation->output_rects)
+		{
+			free(stream->presentation->output_rects);
+			stream->presentation->output_rects = NULL;
+		}
+
+		stream->presentation->output_num_rects = 0;
+	}
 }
 
 void tsmf_presentation_free(TSMF_PRESENTATION* presentation)
@@ -1079,7 +1086,6 @@ void tsmf_stream_free(TSMF_STREAM* stream)
 	TSMF_PRESENTATION* presentation = stream->presentation;
 
 	tsmf_stream_stop(stream);
-	tsmf_stream_flush(stream);
 
 	WaitForSingleObject(presentation->mutex, INFINITE);
 	list_remove(presentation->stream_list, stream);
