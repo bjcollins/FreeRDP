@@ -74,6 +74,39 @@ struct _TSMF_PLUGIN
 	const char* audio_device;
 };
 
+void tsmf_send_eos_response(IWTSVirtualChannelCallback* pChannelCallback, UINT32 message_id)
+{
+	wStream* s;
+	int error;
+	TSMF_CHANNEL_CALLBACK* callback = (TSMF_CHANNEL_CALLBACK*) pChannelCallback;
+
+	if (!callback)
+	{
+		DEBUG_DVC("No callback reference - unable to send eos response!");
+		return;
+	}
+
+	if (callback->stream_id)
+	{
+		s = Stream_New(NULL,24);
+		Stream_Write_UINT32(s, TSMF_INTERFACE_CLIENT_NOTIFICATIONS | STREAM_ID_PROXY);
+		Stream_Write_UINT32(s, message_id);
+		Stream_Write_UINT32(s, CLIENT_EVENT_NOTIFICATION); /* FunctionId */
+		Stream_Write_UINT32(s, callback->stream_id); /* StreamId */
+		Stream_Write_UINT32(s, TSMM_CLIENT_EVENT_ENDOFSTREAM); /* EventId */
+		Stream_Write_UINT32(s, 0); /* cbData */
+
+		DEBUG_DVC("response size %i", (int) Stream_GetPosition(s));
+		error = callback->channel->Write(callback->channel, Stream_GetPosition(s), Stream_Buffer(s), NULL);
+		if (error)
+		{
+			DEBUG_DVC("response error %d", error);
+		}
+
+		Stream_Free(s, TRUE);
+	}
+}
+
 void tsmf_playback_ack(IWTSVirtualChannelCallback* pChannelCallback,
 	UINT32 message_id, UINT64 duration, UINT32 data_size)
 {
@@ -89,7 +122,7 @@ void tsmf_playback_ack(IWTSVirtualChannelCallback* pChannelCallback,
 	Stream_Write_UINT64(s, duration); /* DataDuration */
 	Stream_Write_UINT64(s, data_size); /* cbData */
 	
-	DEBUG_DVC("response size %d", (int) Stream_GetPosition(s));
+	DEBUG_DVC("response size %i", (int) Stream_GetPosition(s));
 	status = callback->channel->Write(callback->channel, Stream_GetPosition(s), Stream_Buffer(s), NULL);
 
 	if (status)

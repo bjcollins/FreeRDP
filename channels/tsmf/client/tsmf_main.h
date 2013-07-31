@@ -20,6 +20,7 @@
 #ifndef __TSMF_MAIN_H
 #define __TSMF_MAIN_H
 
+void tsmf_send_eos_response(IWTSVirtualChannelCallback* pChannelCallback, UINT32 message_id);
 void tsmf_playback_ack(IWTSVirtualChannelCallback* pChannelCallback,
 	UINT32 message_id, UINT64 duration, UINT32 data_size);
 BOOL tsmf_push_event(IWTSVirtualChannelCallback* pChannelCallback,

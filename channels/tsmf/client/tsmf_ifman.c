@@ -544,16 +544,20 @@ int tsmf_ifman_on_end_of_stream(TSMF_IFMAN* ifman)
 	{
 		stream = tsmf_stream_find_by_id(presentation, StreamId);
 		if (stream)
-			tsmf_stream_end(stream);
+			tsmf_stream_end(stream, ifman->message_id, ifman->channel_callback);
 	}
 	DEBUG_DVC("StreamId %d", StreamId);
 
-	Stream_EnsureRemainingCapacity(ifman->output, 16);
-	Stream_Write_UINT32(ifman->output, CLIENT_EVENT_NOTIFICATION); /* FunctionId */
-	Stream_Write_UINT32(ifman->output, StreamId); /* StreamId */
-	Stream_Write_UINT32(ifman->output, TSMM_CLIENT_EVENT_ENDOFSTREAM); /* EventId */
-	Stream_Write_UINT32(ifman->output, 0); /* cbData */
-	ifman->output_interface_id = TSMF_INTERFACE_CLIENT_NOTIFICATIONS | STREAM_ID_PROXY;
+	// Old Immediate response logic
+	//Stream_EnsureRemainingCapacity(ifman->output, 16);
+	//Stream_Write_UINT32(ifman->output, CLIENT_EVENT_NOTIFICATION); /* FunctionId */
+	//Stream_Write_UINT32(ifman->output, StreamId); /* StreamId */
+	//Stream_Write_UINT32(ifman->output, TSMM_CLIENT_EVENT_ENDOFSTREAM); /* EventId */
+	//Stream_Write_UINT32(ifman->output, 0); /* cbData */
+	//ifman->output_interface_id = TSMF_INTERFACE_CLIENT_NOTIFICATIONS | STREAM_ID_PROXY;
+
+	// New delayed response logic
+	ifman->output_pending = TRUE;
 
 	return 0;
 }
