@@ -294,7 +294,7 @@ static BOOL tsmf_gstreamer_set_format(ITSMFDecoder * decoder, TS_AM_MEDIA_TYPE *
 				"wmvversion", G_TYPE_INT, 3,
 				"codec_data", GST_TYPE_BUFFER, gst_buf_cap_codec_data,
 				"format", GST_TYPE_FOURCC, GST_MAKE_FOURCC ('W', 'V', 'C', '1'),
-				//"framerate", GST_TYPE_FRACTION, media_type->SamplesPerSecond.Numerator, media_type->SamplesPerSecond.Denominator,
+				"framerate", GST_TYPE_FRACTION, media_type->SamplesPerSecond.Numerator, media_type->SamplesPerSecond.Denominator,
 				NULL);
 			break;
 		case TSMF_SUB_TYPE_MP4S:
@@ -333,15 +333,51 @@ static BOOL tsmf_gstreamer_set_format(ITSMFDecoder * decoder, TS_AM_MEDIA_TYPE *
 				"bitrate", G_TYPE_UINT, media_type->BitRate,
 				"width", G_TYPE_INT, media_type->Width,
 				"height", G_TYPE_INT, media_type->Height,
+				"format", GST_TYPE_FOURCC, GST_MAKE_FOURCC ('M', 'P', '4', '2'),
+				"framerate", GST_TYPE_FRACTION, media_type->SamplesPerSecond.Numerator, media_type->SamplesPerSecond.Denominator,
 				NULL);
 			break;
 		case TSMF_SUB_TYPE_MP43:
 			mdecoder->gst_caps =  gst_caps_new_simple ("video/x-msmpeg",
+				"msmpegversion", G_TYPE_INT, 43,
 				"bitrate", G_TYPE_UINT, media_type->BitRate,
 				"width", G_TYPE_INT, media_type->Width,
 				"height", G_TYPE_INT, media_type->Height,
 				"format", GST_TYPE_FOURCC, GST_MAKE_FOURCC ('M', 'P', '4', '3'),
+				"framerate", GST_TYPE_FRACTION, media_type->SamplesPerSecond.Numerator, media_type->SamplesPerSecond.Denominator,
 				NULL);
+			break;
+		case TSMF_SUB_TYPE_M4S2:
+			if (media_type->ExtraDataSize > 0)
+			{
+				gst_buf_cap_codec_data = gst_buffer_try_new_and_alloc(media_type->ExtraDataSize);
+				if (gst_buf_cap_codec_data != NULL)
+				{
+					memcpy(GST_BUFFER_MALLOCDATA(gst_buf_cap_codec_data), media_type->ExtraData, media_type->ExtraDataSize);
+				}
+				else
+				{
+					DEBUG_WARN("tsmf_gstreamer_set_format: gst_buffer_try_new_and_alloc(%d) failed.", media_type->ExtraDataSize);
+				}
+
+
+				mdecoder->gst_caps =  gst_caps_new_simple ("video/mpeg",
+					"width", G_TYPE_INT, media_type->Width,
+					"height", G_TYPE_INT, media_type->Height,
+					"format", GST_TYPE_FOURCC, GST_MAKE_FOURCC ('M', '4', 'S', '2'),
+					"framerate", GST_TYPE_FRACTION, media_type->SamplesPerSecond.Numerator, media_type->SamplesPerSecond.Denominator,
+					"codec_data", GST_TYPE_BUFFER, gst_buf_cap_codec_data,
+					NULL);
+			}
+			else
+			{
+				mdecoder->gst_caps =  gst_caps_new_simple ("video/mpeg",
+					"width", G_TYPE_INT, media_type->Width,
+					"height", G_TYPE_INT, media_type->Height,
+					"format", GST_TYPE_FOURCC, GST_MAKE_FOURCC ('M', '4', 'S', '2'),
+					"framerate", GST_TYPE_FRACTION, media_type->SamplesPerSecond.Numerator, media_type->SamplesPerSecond.Denominator,
+					NULL);
+			}
 			break;
 		case TSMF_SUB_TYPE_WMA9:
 			if (media_type->ExtraDataSize > 0)
@@ -378,6 +414,30 @@ static BOOL tsmf_gstreamer_set_format(ITSMFDecoder * decoder, TS_AM_MEDIA_TYPE *
 					"block_align", G_TYPE_INT, media_type->BlockAlign,
 					NULL);			
 			}
+			break;
+		case TSMF_SUB_TYPE_WMA1:
+			gst_buf_cap_codec_data = gst_buffer_try_new_and_alloc(media_type->ExtraDataSize);
+			if (gst_buf_cap_codec_data != NULL)
+			{
+				memcpy(GST_BUFFER_MALLOCDATA(gst_buf_cap_codec_data),
+					media_type->ExtraData, media_type->ExtraDataSize);
+			}
+			else
+			{
+				DEBUG_WARN("tsmf_gstreamer_set_format: gst_buffer_try_new_and_alloc(%d) failed.",
+				media_type->ExtraDataSize);
+			}
+
+			mdecoder->gst_caps =  gst_caps_new_simple ("audio/x-wma",
+				"wmaversion", G_TYPE_INT, 1,
+				"rate", G_TYPE_INT, media_type->SamplesPerSecond.Numerator,
+				"channels", G_TYPE_INT, media_type->Channels,
+				"bitrate", G_TYPE_INT, media_type->BitRate,
+				"depth", G_TYPE_INT, media_type->BitsPerSample,
+				"width", G_TYPE_INT, media_type->BitsPerSample,
+				"block_align", G_TYPE_INT, media_type->BlockAlign,
+				"codec_data", GST_TYPE_BUFFER, gst_buf_cap_codec_data,
+				NULL);
 			break;
 		case TSMF_SUB_TYPE_WMA2:
 			gst_buf_cap_codec_data = gst_buffer_try_new_and_alloc(media_type->ExtraDataSize);
@@ -420,6 +480,7 @@ static BOOL tsmf_gstreamer_set_format(ITSMFDecoder * decoder, TS_AM_MEDIA_TYPE *
 				"height", G_TYPE_INT, media_type->Height,
 				"wmvversion", G_TYPE_INT, 1,
 				"format", GST_TYPE_FOURCC, GST_MAKE_FOURCC ('W', 'M', 'V', '1'),
+				"framerate", GST_TYPE_FRACTION, media_type->SamplesPerSecond.Numerator, media_type->SamplesPerSecond.Denominator,
 				NULL);
 			break;
 		case TSMF_SUB_TYPE_WMV2:
@@ -440,6 +501,8 @@ static BOOL tsmf_gstreamer_set_format(ITSMFDecoder * decoder, TS_AM_MEDIA_TYPE *
 				"wmvversion", G_TYPE_INT, 2,
 				"codec_data", GST_TYPE_BUFFER, gst_buf_cap_codec_data,
 				"format", GST_TYPE_FOURCC, GST_MAKE_FOURCC ('W', 'M', 'V', '2'),
+				"framerate", GST_TYPE_FRACTION, media_type->SamplesPerSecond.Numerator, media_type->SamplesPerSecond.Denominator,
+				"pixel-aspect-ratio", GST_TYPE_FRACTION, 1 , 1,
 				NULL);
 			break;
 		case TSMF_SUB_TYPE_WMV3:
@@ -461,7 +524,7 @@ static BOOL tsmf_gstreamer_set_format(ITSMFDecoder * decoder, TS_AM_MEDIA_TYPE *
 				"wmvversion", G_TYPE_INT, 3,
 				"codec_data", GST_TYPE_BUFFER, gst_buf_cap_codec_data,
 				"format", GST_TYPE_FOURCC, GST_MAKE_FOURCC ('W', 'M', 'V', '3'),
-				//"framerate", GST_TYPE_FRACTION, media_type->SamplesPerSecond.Numerator, media_type->SamplesPerSecond.Denominator,
+				"framerate", GST_TYPE_FRACTION, media_type->SamplesPerSecond.Numerator, media_type->SamplesPerSecond.Denominator,
 				NULL);
 			break;
 		case TSMF_SUB_TYPE_AVC1:
@@ -481,7 +544,10 @@ static BOOL tsmf_gstreamer_set_format(ITSMFDecoder * decoder, TS_AM_MEDIA_TYPE *
 					"width", G_TYPE_INT, media_type->Width,
 					"height", G_TYPE_INT, media_type->Height,
 					"codec_data", GST_TYPE_BUFFER, gst_buf_cap_codec_data,
-					//"framerate", GST_TYPE_FRACTION, media_type->SamplesPerSecond.Numerator, media_type->SamplesPerSecond.Denominator,
+					"framerate", GST_TYPE_FRACTION, media_type->SamplesPerSecond.Numerator, media_type->SamplesPerSecond.Denominator,
+					"pixel-aspect-ratio", GST_TYPE_FRACTION, 1 , 1,
+					"stream-format", G_TYPE_STRING, "byte-stream", // avc
+					"alignment", G_TYPE_STRING, "nal", // au
 					NULL);
 			}
 			else
@@ -489,7 +555,11 @@ static BOOL tsmf_gstreamer_set_format(ITSMFDecoder * decoder, TS_AM_MEDIA_TYPE *
 				mdecoder->gst_caps = gst_caps_new_simple ("video/x-h264",
 					"width", G_TYPE_INT, media_type->Width,
 					"height", G_TYPE_INT, media_type->Height,
-					//"framerate", GST_TYPE_FRACTION, media_type->SamplesPerSecond.Numerator, media_type->SamplesPerSecond.Denominator,
+					"framerate", GST_TYPE_FRACTION, media_type->SamplesPerSecond.Numerator, media_type->SamplesPerSecond.Denominator,
+					"pixel-aspect-ratio", GST_TYPE_FRACTION, 1 , 1,
+					"stream-format", G_TYPE_STRING, "byte-stream", // "avc"
+					"alignment", G_TYPE_STRING, "nal", // "au"
+
 					NULL);
 			}
 			break;
@@ -524,6 +594,8 @@ static BOOL tsmf_gstreamer_set_format(ITSMFDecoder * decoder, TS_AM_MEDIA_TYPE *
 				"channels", G_TYPE_INT, media_type->Channels,
 				"mpegversion", G_TYPE_INT, 4,
 				"codec_data", GST_TYPE_BUFFER, gst_buf_cap_codec_data,
+				"framed", G_TYPE_BOOLEAN, TRUE,
+				"stream-format", G_TYPE_STRING, "raw",
 				NULL);
 			break;
 		case TSMF_SUB_TYPE_MP1A:
@@ -579,7 +651,7 @@ static BOOL tsmf_gstreamer_set_format(ITSMFDecoder * decoder, TS_AM_MEDIA_TYPE *
 			break;
 		case TSMF_SUB_TYPE_MP2A:
 			mdecoder->gst_caps =  gst_caps_new_simple ("audio/mpeg",
-				"mpegversion", G_TYPE_INT, 2,
+				"mpegversion", G_TYPE_INT, 1,
 				"rate", G_TYPE_INT, media_type->SamplesPerSecond.Numerator,
 				"channels", G_TYPE_INT, media_type->Channels,
 				NULL);
@@ -740,6 +812,10 @@ static BOOL tsmf_gstreamer_pipeline_build(TSMFGstreamerDecoder * mdecoder)
 
 	switch (mdecoder->tsmf_media_type.SubType)
 	{
+		case TSMF_SUB_TYPE_WMA1:
+			mdecoder->decbin = gst_element_factory_make ("fluwmadec", NULL);
+			DEBUG_DVC("tsmf_gstreamer_pipeline_build: WMA1");
+			break;
 		case TSMF_SUB_TYPE_WMA2:
 			mdecoder->decbin = gst_element_factory_make ("fluwmadec", NULL);
 			if (!mdecoder->decbin)
@@ -775,12 +851,22 @@ static BOOL tsmf_gstreamer_pipeline_build(TSMFGstreamerDecoder * mdecoder)
 			DEBUG_DVC("tsmf_gstreamer_pipeline_build: MP4S");
 			break;
 		case TSMF_SUB_TYPE_MP42:
-			mdecoder->decbin = gst_element_factory_make ("ffdec_msmpeg4v2", NULL);
+			mdecoder->decbin = gst_element_factory_make ("fludivx3dec", NULL);
+			if(!mdecoder->decbin)
+				mdecoder->decbin = gst_element_factory_make ("ffdec_msmpeg4v2", NULL);
 			DEBUG_DVC("tsmf_gstreamer_pipeline_build: MP42");
 			break;
 		case TSMF_SUB_TYPE_MP43:
-			mdecoder->decbin = gst_element_factory_make ("ffdec_msmpeg4", NULL);
+			mdecoder->decbin = gst_element_factory_make ("fludivx3dec", NULL);
+                        if(!mdecoder->decbin)
+				mdecoder->decbin = gst_element_factory_make ("ffdec_msmpeg4", NULL);
 			DEBUG_DVC("tsmf_gstreamer_pipeline_build: MP43");
+			break;
+		case TSMF_SUB_TYPE_M4S2:
+			mdecoder->decbin = gst_element_factory_make ("flumpeg4vdec", NULL);
+			if(!mdecoder->decbin)
+				mdecoder->decbin = gst_element_factory_make ("ffdec_msmpeg4", NULL);
+			DEBUG_DVC("tsmf_gstreamer_pipeline_build: M4S2");
 			break;
 		case TSMF_SUB_TYPE_MP2V:
 			if (OMXavailable)
@@ -794,16 +880,22 @@ static BOOL tsmf_gstreamer_pipeline_build(TSMFGstreamerDecoder * mdecoder)
 			else
 				mdecoder->decbin = NULL;
 			if (!mdecoder->decbin)
+				mdecoder->decbin = gst_element_factory_make ("flumpeg2vdec", NULL);
+			if (!mdecoder->decbin)
 				mdecoder->decbin = gst_element_factory_make ("ffdec_mpeg2video", NULL);
 
 			DEBUG_DVC("tsmf_gstreamer_pipeline_build: MPEG2 Video");
 			break;
 		case TSMF_SUB_TYPE_WMV1:
-			mdecoder->decbin = gst_element_factory_make ("ffdec_wmv1", NULL);
+			mdecoder->decbin = gst_element_factory_make ("fluwmvdec", NULL);
+			if (!mdecoder->decbin)
+				mdecoder->decbin = gst_element_factory_make ("ffdec_wmv1", NULL);
 			DEBUG_DVC("tsmf_gstreamer_pipeline_build: WMV1");
 			break;
 		case TSMF_SUB_TYPE_WMV2:
-			mdecoder->decbin = gst_element_factory_make ("ffdec_wmv2", NULL);
+			mdecoder->decbin = gst_element_factory_make ("fluwmvdec", NULL);
+			if (!mdecoder->decbin)
+				mdecoder->decbin = gst_element_factory_make ("ffdec_wmv2", NULL);
 			DEBUG_DVC("tsmf_gstreamer_pipeline_build: WMV2");
 			break;
 		case TSMF_SUB_TYPE_WVC1:
@@ -857,8 +949,9 @@ static BOOL tsmf_gstreamer_pipeline_build(TSMFGstreamerDecoder * mdecoder)
 			DEBUG_DVC("tsmf_gstreamer_pipeline_build: H264");
 			break;
 		case TSMF_SUB_TYPE_AC3:
-			mdecoder->decbin = gst_element_factory_make ("ffdec_ac3", NULL);
-			//mdecoder->decbin = gst_element_factory_make ("ffdec_ac3", NULL);//no fluendo equivalent?
+			mdecoder->decbin = gst_element_factory_make("fluac3dec", NULL);
+			if (!mdecoder->decbin)
+				mdecoder->decbin = gst_element_factory_make ("ffdec_ac3", NULL);
 			DEBUG_DVC("tsmf_gstreamer_pipeline_build: AC3");
 			break;
 		case TSMF_SUB_TYPE_AAC:
@@ -870,7 +963,7 @@ static BOOL tsmf_gstreamer_pipeline_build(TSMFGstreamerDecoder * mdecoder)
 			DEBUG_DVC("tsmf_gstreamer_pipeline_build: AAC");
 			break;
 		case TSMF_SUB_TYPE_MP2A:
-			mdecoder->decbin = gst_element_factory_make ("fluaacdec", NULL);
+			mdecoder->decbin = gst_element_factory_make ("flump3dec", NULL);
 			if (!mdecoder->decbin)
 				mdecoder->decbin = gst_element_factory_make ("faad", NULL);
 			DEBUG_DVC("tsmf_gstreamer_pipeline_build: MP2A");
@@ -880,7 +973,9 @@ static BOOL tsmf_gstreamer_pipeline_build(TSMFGstreamerDecoder * mdecoder)
 			DEBUG_DVC("tsmf_gstreamer_pipeline_build: MP1A");
 			break;
 		case TSMF_SUB_TYPE_MP1V:
-			mdecoder->decbin = gst_element_factory_make ("ffdec_mpegvideo", NULL);
+			mdecoder->decbin = gst_element_factory_make ("flumpeg2vdec", NULL);
+			if (!mdecoder->decbin)
+				mdecoder->decbin = gst_element_factory_make ("ffdec_mpegvideo", NULL);
 			DEBUG_DVC("tsmf_gstreamer_pipeline_build: MP1V");
 			break;
 		default:
@@ -901,11 +996,17 @@ static BOOL tsmf_gstreamer_pipeline_build(TSMFGstreamerDecoder * mdecoder)
 			if (hwaccelflu)
 			{
 				mdecoder->outconv = gst_element_factory_make ("queue", "queuetosink"); 
+				g_object_set(G_OBJECT(mdecoder->outconv), "max-size-buffers", 0, NULL);
+				g_object_set(G_OBJECT(mdecoder->outconv), "max-size-bytes", 0, NULL);
+				g_object_set(G_OBJECT(mdecoder->outconv), "max-size-time", (guint64) 0, NULL);
 				mdecoder->outsink = gst_element_factory_make ("fluvasink", "videosink");
 			}
 			else if(hwaccelomx)
 			{
 				mdecoder->outconv = gst_element_factory_make ("queue", "queuetosink"); 
+				g_object_set(G_OBJECT(mdecoder->outconv), "max-size-buffers", 0, NULL);
+				g_object_set(G_OBJECT(mdecoder->outconv), "max-size-bytes", 0, NULL);
+				g_object_set(G_OBJECT(mdecoder->outconv), "max-size-time", (guint64) 0, NULL);
 				mdecoder->outsink = gst_element_factory_make ("gemxvimagesink", "videosink");
 			}
 			else

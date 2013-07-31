@@ -118,6 +118,8 @@
 #define TSMF_SUB_TYPE_MP43                 17
 #define TSMF_SUB_TYPE_MP4S                 18
 #define TSMF_SUB_TYPE_MP42                 19
+#define TSMF_SUB_TYPE_M4S2                 20
+#define TSMF_SUB_TYPE_WMA1                 21
 
 /* FormatType */
 #define TSMF_FORMAT_TYPE_UNKNOWN            0
