@@ -72,6 +72,7 @@ struct _TSMF_PLUGIN
 	const char* decoder_name;
 	const char* audio_name;
 	const char* audio_device;
+	const char* disabled_codecs;
 };
 
 void tsmf_send_eos_response(IWTSVirtualChannelCallback* pChannelCallback, UINT32 message_id)
@@ -185,6 +186,7 @@ static int tsmf_on_data_received(IWTSVirtualChannelCallback* pChannelCallback,
 	ifman.decoder_name = ((TSMF_PLUGIN*) callback->plugin)->decoder_name;
 	ifman.audio_name = ((TSMF_PLUGIN*) callback->plugin)->audio_name;
 	ifman.audio_device = ((TSMF_PLUGIN*) callback->plugin)->audio_device;
+	ifman.disabled_codecs = ((TSMF_PLUGIN*) callback->plugin)->disabled_codecs;
 	memcpy(ifman.presentation_id, callback->presentation_id, 16);
 	ifman.stream_id = callback->stream_id;
 	ifman.message_id = MessageId;
@@ -456,6 +458,7 @@ COMMAND_LINE_ARGUMENT_A tsmf_args[] =
 	{ "audio", COMMAND_LINE_VALUE_REQUIRED, "<subsystem>", NULL, NULL, -1, NULL, "audio subsystem" },
 	{ "audio-dev", COMMAND_LINE_VALUE_REQUIRED, "<device>", NULL, NULL, -1, NULL, "audio device name" },
 	{ "decoder", COMMAND_LINE_VALUE_REQUIRED, "<subsystem>", NULL, NULL, -1, NULL, "decoder subsystem" },
+	{ "disabled_codecs", COMMAND_LINE_VALUE_REQUIRED, "<codec_list>", NULL, NULL, -1, NULL, "disabled codec list" },
 	{ NULL, 0, NULL, NULL, NULL, -1, NULL, NULL }
 };
 
@@ -465,6 +468,9 @@ static void tsmf_process_addin_args(IWTSPlugin* pPlugin, ADDIN_ARGV* args)
 	DWORD flags;
 	COMMAND_LINE_ARGUMENT_A* arg;
 	TSMF_PLUGIN* tsmf = (TSMF_PLUGIN*) pPlugin;
+
+	// Initialize disabled codecs string
+	tsmf->disabled_codecs = NULL;
 
 	flags = COMMAND_LINE_SIGIL_NONE | COMMAND_LINE_SEPARATOR_COLON;
 
@@ -491,6 +497,10 @@ static void tsmf_process_addin_args(IWTSPlugin* pPlugin, ADDIN_ARGV* args)
 		CommandLineSwitchCase(arg, "decoder")
 		{
 			tsmf->decoder_name = _strdup(arg->Value);
+		}
+		CommandLineSwitchCase(arg, "disabled_codecs")
+		{
+			tsmf->disabled_codecs = _strdup(arg->Value);
 		}
 		CommandLineSwitchDefault(arg)
 		{

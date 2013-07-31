@@ -111,7 +111,7 @@ int tsmf_ifman_check_format_support_request(TSMF_IFMAN* ifman)
 
 	DEBUG_DVC("PlatformCookie %d numMediaType %d", PlatformCookie, numMediaType);
 
-	if (!tsmf_codec_check_media_type(ifman->input, ifman->decoder_name))
+	if (!tsmf_codec_check_media_type(ifman->input, ifman->decoder_name, ifman->disabled_codecs))
 		FormatSupported = 0;
 
 	if (FormatSupported)
@@ -178,7 +178,7 @@ int tsmf_ifman_add_stream(TSMF_IFMAN* ifman)
 		stream = tsmf_stream_new(presentation, StreamId);
 
 		if (stream)
-			tsmf_stream_set_format(stream, ifman->decoder_name, ifman->input);
+			tsmf_stream_set_format(stream, ifman->decoder_name, ifman->input, ifman->disabled_codecs);
 	}
 
 	ifman->output_pending = TRUE;

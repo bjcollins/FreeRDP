@@ -1174,7 +1174,7 @@ TSMF_STREAM* tsmf_stream_find_by_id(TSMF_PRESENTATION* presentation, UINT32 stre
 	return NULL;
 }
 
-void tsmf_stream_set_format(TSMF_STREAM* stream, const char* name, wStream* s)
+void tsmf_stream_set_format(TSMF_STREAM* stream, const char* name, wStream* s, const char *disabled_codecs)
 {
 	TS_AM_MEDIA_TYPE mediatype;
 
@@ -1184,7 +1184,7 @@ void tsmf_stream_set_format(TSMF_STREAM* stream, const char* name, wStream* s)
 		return;
 	}
 
-	tsmf_codec_parse_media_type(&mediatype, s);
+	tsmf_codec_parse_media_type(&mediatype, s, disabled_codecs);
 
 	if (mediatype.MajorType == TSMF_MAJOR_TYPE_VIDEO)
 	{

@@ -381,11 +381,97 @@ typedef struct tagVIDEOINFOHEADER {
 	return 48;
 }
 
-BOOL tsmf_codec_parse_media_type(TS_AM_MEDIA_TYPE* mediatype, wStream* s)
+BOOL tsmf_codec_parse_media_type(TS_AM_MEDIA_TYPE* mediatype, wStream* s, const char *disabled_codecs)
 {
 	int i;
 	UINT32 cbFormat;
 	BOOL ret = TRUE;
+
+	static BOOL disable_wvc1 = FALSE;
+	static BOOL disable_wma1 = FALSE;
+	static BOOL disable_wma2 = FALSE;
+	static BOOL disable_wma9 = FALSE;
+	static BOOL disable_mp3  = FALSE;
+	static BOOL disable_mp2a = FALSE;
+	static BOOL disable_mp2v = FALSE;
+	static BOOL disable_wmv1 = FALSE;
+	static BOOL disable_wmv2 = FALSE;
+	static BOOL disable_wmv3 = FALSE;
+	static BOOL disable_aac  = FALSE;
+	static BOOL disable_h264 = FALSE;
+	static BOOL disable_avc1 = FALSE;
+	static BOOL disable_mp43 = FALSE;
+	static BOOL disable_mp4s = FALSE;
+	static BOOL disable_mp42 = FALSE;    
+	static BOOL disable_m4s2 = FALSE;
+	static BOOL disable_mp1a = FALSE;
+	static BOOL disable_mp1v = FALSE;
+	static BOOL disable_ac3  = FALSE;
+	static BOOL firstRun = TRUE;
+
+	if (firstRun)
+	{
+		if (disabled_codecs != NULL)
+		{
+			char *token = NULL;
+			char *saveptr;
+
+			char *allTokens = (char *) malloc(strlen(disabled_codecs) + 1);
+			strcpy(allTokens,disabled_codecs);
+
+			token = strtok_r(allTokens, ",", &saveptr);
+
+			// Determine which codecs were disabled from the command line
+			while (token != NULL)
+			{
+				if (strcmp(token, "wvc1")      == 0)
+					disable_wvc1 = TRUE;
+				else if (strcmp(token, "wma1") == 0)
+					disable_wma1 = TRUE;
+				else if (strcmp(token, "wma2") == 0)
+					disable_wma2 = TRUE;
+				else if (strcmp(token, "wma9") == 0)
+					disable_wma9 = TRUE;
+				else if (strcmp(token, "mp3")  == 0)
+					disable_mp3 = TRUE;
+				else if (strcmp(token, "mp2a") == 0)
+					disable_mp2a = TRUE;
+				else if (strcmp(token, "mp2v") == 0)
+					disable_mp2v = TRUE;
+				else if (strcmp(token, "wmv1") == 0)
+					disable_wmv1 = TRUE;
+				else if (strcmp(token, "wmv2") == 0)
+					disable_wmv2 = TRUE;    
+				else if (strcmp(token, "wmv3") == 0)
+					disable_wmv3 = TRUE;
+				else if (strcmp(token, "aac")  == 0)
+					disable_aac = TRUE;
+				else if (strcmp(token, "h264") == 0)
+					disable_h264 = TRUE;
+				else if (strcmp(token, "avc1") == 0)
+					disable_avc1 = TRUE;
+				else if (strcmp(token, "mp43") == 0)
+					disable_mp43 = TRUE;
+				else if (strcmp(token, "mp4s") == 0)
+					disable_mp4s = TRUE;
+				else if (strcmp(token, "mp42") == 0)
+					disable_mp42 = TRUE;    
+				else if (strcmp(token, "m4s2") == 0)
+					disable_m4s2 = TRUE;
+				else if (strcmp(token, "mp1a") == 0)
+					disable_mp1a = TRUE;
+				else if (strcmp(token, "mp1v") == 0)
+					disable_mp1v = TRUE;
+				else if (strcmp(token, "ac3") == 0)
+					disable_ac3 = TRUE;
+
+				token = strtok_r(NULL, ",", &saveptr);
+			}
+
+			free(allTokens);        
+			firstRun = FALSE;
+		}
+	}
 
 	memset(mediatype, 0, sizeof(TS_AM_MEDIA_TYPE));
 
@@ -414,6 +500,32 @@ BOOL tsmf_codec_parse_media_type(TS_AM_MEDIA_TYPE* mediatype, wStream* s)
 	mediatype->SubType = tsmf_sub_type_map[i].type;
 	if (mediatype->SubType == TSMF_SUB_TYPE_UNKNOWN)
 		ret = FALSE;
+
+	// Additional checks for specifically disabled codecs
+	if (((mediatype->SubType == TSMF_SUB_TYPE_WVC1) && disable_wvc1) ||
+	    ((mediatype->SubType == TSMF_SUB_TYPE_WMA1) && disable_wma1) ||
+	    ((mediatype->SubType == TSMF_SUB_TYPE_WMA2) && disable_wma2) ||
+	    ((mediatype->SubType == TSMF_SUB_TYPE_WMA9) && disable_wma9) ||
+	    ((mediatype->SubType == TSMF_SUB_TYPE_MP3)  && disable_mp3)  ||
+	    ((mediatype->SubType == TSMF_SUB_TYPE_MP2A) && disable_mp2a) ||
+	    ((mediatype->SubType == TSMF_SUB_TYPE_MP2V) && disable_mp2v) ||
+	    ((mediatype->SubType == TSMF_SUB_TYPE_WMV1) && disable_wmv1) ||
+	    ((mediatype->SubType == TSMF_SUB_TYPE_WMV2) && disable_wmv2) ||
+	    ((mediatype->SubType == TSMF_SUB_TYPE_WMV3) && disable_wmv3) ||
+	    ((mediatype->SubType == TSMF_SUB_TYPE_AAC)  && disable_aac)  ||
+	    ((mediatype->SubType == TSMF_SUB_TYPE_H264) && disable_h264) ||
+	    ((mediatype->SubType == TSMF_SUB_TYPE_AVC1) && disable_avc1) ||
+	    ((mediatype->SubType == TSMF_SUB_TYPE_MP43) && disable_mp43) ||
+	    ((mediatype->SubType == TSMF_SUB_TYPE_MP4S) && disable_mp4s) ||
+	    ((mediatype->SubType == TSMF_SUB_TYPE_MP42) && disable_mp42) ||
+	    ((mediatype->SubType == TSMF_SUB_TYPE_M4S2) && disable_m4s2) ||
+	    ((mediatype->SubType == TSMF_SUB_TYPE_MP1A) && disable_mp1a) ||
+	    ((mediatype->SubType == TSMF_SUB_TYPE_MP1V) && disable_mp1v) ||
+	    ((mediatype->SubType == TSMF_SUB_TYPE_AC3) && disable_ac3))
+	{
+		ret = FALSE;
+	}
+
 	DEBUG_DVC("SubType %s", tsmf_sub_type_map[i].name);
 	Stream_Seek(s, 16);
 
@@ -528,7 +640,7 @@ BOOL tsmf_codec_parse_media_type(TS_AM_MEDIA_TYPE* mediatype, wStream* s)
 	return ret;
 }
 
-BOOL tsmf_codec_check_media_type(wStream* s, const char *name)
+BOOL tsmf_codec_check_media_type(wStream* s, const char *name, const char *disabled_codecs)
 {
 	BYTE* m;
 	BOOL ret = FALSE;
@@ -546,7 +658,7 @@ BOOL tsmf_codec_check_media_type(wStream* s, const char *name)
 
 	Stream_GetPointer(s, m);
 	if (decoderAvailable)
-		ret = tsmf_codec_parse_media_type(&mediatype, s);
+		ret = tsmf_codec_parse_media_type(&mediatype, s, disabled_codecs);
 	Stream_SetPointer(s, m);
 
 	return ret;

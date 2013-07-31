@@ -27,6 +27,7 @@ struct _TSMF_IFMAN
 	const char* decoder_name;
 	const char* audio_name;
 	const char* audio_device;
+	const char* disabled_codecs;
 	BYTE presentation_id[16];
 	UINT32 stream_id;
 	UINT32 message_id;
