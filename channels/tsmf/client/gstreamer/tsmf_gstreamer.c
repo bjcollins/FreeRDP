@@ -72,6 +72,7 @@ typedef struct _TSMFGstreamerDecoder
 	GstElement *decbin;
 	GstElement *outbin;
 	GstElement *outconv;
+	GstElement *vidscale;
 	GstElement *outsink;
 	GstElement *aVolume;
 	GstElement *aResample;
@@ -684,6 +685,9 @@ static void tsmf_gstreamer_clean_up(TSMFGstreamerDecoder * mdecoder, BOOL do_unr
 
 		if (mdecoder->aResample)
                         gst_object_unref(mdecoder->aResample);
+
+		if (mdecoder->vidscale)
+			gst_object_unref(mdecoder->vidscale);
 	}
 
 	mdecoder->src = NULL;
@@ -694,6 +698,7 @@ static void tsmf_gstreamer_clean_up(TSMFGstreamerDecoder * mdecoder, BOOL do_unr
 	mdecoder->outsink = NULL;
 	mdecoder->aVolume = NULL;
 	mdecoder->aResample = NULL;
+	mdecoder->vidscale = NULL;
 }
 
 
@@ -906,6 +911,7 @@ static BOOL tsmf_gstreamer_pipeline_build(TSMFGstreamerDecoder * mdecoder)
 			else
 			{
 				mdecoder->outconv = gst_element_factory_make ("ffmpegcolorspace", "vconv"); 
+				mdecoder->vidscale = gst_element_factory_make ("videoscale", "vscale"); 
 				mdecoder->outsink = gst_element_factory_make ("xvimagesink", "videosink");
 			}
 			DEBUG_DVC("tsmf_gstreamer_pipeline_build: building Video Pipe");
@@ -1010,6 +1016,11 @@ static BOOL tsmf_gstreamer_pipeline_build(TSMFGstreamerDecoder * mdecoder)
 		}
 		else
 			linkResult = gst_element_link_many(mdecoder->outconv, mdecoder->aVolume, mdecoder->outsink, NULL);
+	}
+	else if (mdecoder->vidscale)
+	{
+		gst_bin_add(GST_BIN(mdecoder->outbin), mdecoder->vidscale);
+		linkResult = gst_element_link_many(mdecoder->outconv, mdecoder->vidscale, mdecoder->outsink, NULL);
 	}
 	else
 	{
