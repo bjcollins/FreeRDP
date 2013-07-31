@@ -528,14 +528,25 @@ BOOL tsmf_codec_parse_media_type(TS_AM_MEDIA_TYPE* mediatype, wStream* s)
 	return ret;
 }
 
-BOOL tsmf_codec_check_media_type(wStream* s)
+BOOL tsmf_codec_check_media_type(wStream* s, const char *name)
 {
 	BYTE* m;
-	BOOL ret;
+	BOOL ret = FALSE;
 	TS_AM_MEDIA_TYPE mediatype;
 
+	static BOOL decoderAvailable = FALSE;
+	static BOOL firstRun = TRUE;
+
+	if (firstRun)
+	{
+		firstRun = FALSE;
+		if (tsmf_check_decoder_available(name))
+			decoderAvailable = TRUE;
+	}
+
 	Stream_GetPointer(s, m);
-	ret = tsmf_codec_parse_media_type(&mediatype, s);
+	if (decoderAvailable)
+		ret = tsmf_codec_parse_media_type(&mediatype, s);
 	Stream_SetPointer(s, m);
 
 	return ret;

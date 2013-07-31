@@ -111,7 +111,7 @@ int tsmf_ifman_check_format_support_request(TSMF_IFMAN* ifman)
 
 	DEBUG_DVC("PlatformCookie %d numMediaType %d", PlatformCookie, numMediaType);
 
-	if (!tsmf_codec_check_media_type(ifman->input))
+	if (!tsmf_codec_check_media_type(ifman->input, ifman->decoder_name))
 		FormatSupported = 0;
 
 	if (FormatSupported)
