@@ -24,6 +24,8 @@
 #include <X11/Xlib.h>
 #include <X11/extensions/Xrandr.h>
 #include <X11/extensions/shape.h>
+#include <X11/extensions/Xv.h>
+#include <X11/extensions/Xvlib.h>
 
 #include <fcntl.h>
 #include <stdio.h>
@@ -142,6 +144,70 @@ static const char *tsmf_gstreamer_state_name(GstState state)
 
 	return name;
 }
+
+static BOOL tsmf_gstreamer_pipeline_xv_available(Display *display)
+{
+	BOOL returnValue = FALSE;
+	int ret;
+	unsigned int i;
+	unsigned int version;
+	unsigned int release;
+	unsigned int event_base;
+	unsigned int error_base;
+	unsigned int request_base;
+	unsigned int num_adaptors;
+	unsigned int num_xv_ports = 0;
+	XvAdaptorInfo* ai;
+
+	XLockDisplay(display);  
+	ret = XvQueryExtension(display, &version, &release, &request_base, &event_base, &error_base);
+ 
+	if (ret != Success)
+	{
+		DEBUG_DVC("XvQueryExtension failed %d.", ret);
+		returnValue = FALSE;
+	}
+	else
+	{
+		DEBUG_DVC("version %u release %u", version, release);
+
+		ret = XvQueryAdaptors(display, DefaultRootWindow(display),
+			&num_adaptors, &ai);
+
+		if (ret != Success)
+		{
+			DEBUG_DVC("XvQueryAdaptors failed %d.", ret);
+			returnValue = FALSE;
+		}
+		else
+		{
+			for (i = 0; i < num_adaptors; i++)
+			{
+				DEBUG_DVC("adapter port %ld-%ld (%s)", ai[i].base_id, ai[i].base_id + ai[i].num_ports - 1, ai[i].name);
+				num_xv_ports += ai[i].num_ports;
+			}
+
+			if (num_adaptors > 0)
+				XvFreeAdaptorInfo(ai);
+
+			if (num_xv_ports == 0)
+			{
+				DEBUG_DVC("no xv ports available, will use ximagesink.");
+				returnValue = FALSE;
+			}
+			else
+			{
+				DEBUG_DVC("xv ports are available, will use xvimagesink.");
+				returnValue = TRUE;
+			}
+		}
+	}
+	XUnlockDisplay(display);
+
+	return returnValue;
+}
+
+
 
 static int tsmf_gstreamer_pipeline_set_state(TSMFGstreamerDecoder * mdecoder, GstState desired_state)
 {
@@ -992,6 +1058,11 @@ static BOOL tsmf_gstreamer_pipeline_build(TSMFGstreamerDecoder * mdecoder)
 	{
 		case TSMF_MAJOR_TYPE_VIDEO:
 		{
+			if (!mdecoder->disp)
+				mdecoder->disp = XOpenDisplay(NULL);
+
+			BOOL useXV = tsmf_gstreamer_pipeline_xv_available(mdecoder->disp);
+
 			mdecoder->outbin = gst_bin_new ("videobin");
 			if (hwaccelflu)
 			{
@@ -1012,8 +1083,12 @@ static BOOL tsmf_gstreamer_pipeline_build(TSMFGstreamerDecoder * mdecoder)
 			else
 			{
 				mdecoder->outconv = gst_element_factory_make ("ffmpegcolorspace", "vconv"); 
-				mdecoder->vidscale = gst_element_factory_make ("videoscale", "vscale"); 
-				mdecoder->outsink = gst_element_factory_make ("xvimagesink", "videosink");
+				mdecoder->vidscale = gst_element_factory_make ("videoscale", "vscale");
+				
+				if (useXV) 
+					mdecoder->outsink = gst_element_factory_make ("xvimagesink", "videosink");
+				else
+					mdecoder->outsink = gst_element_factory_make ("ximagesink", "videosink");
 			}
 			DEBUG_DVC("tsmf_gstreamer_pipeline_build: building Video Pipe");
 
@@ -1021,9 +1096,6 @@ static BOOL tsmf_gstreamer_pipeline_build(TSMFGstreamerDecoder * mdecoder)
 				DEBUG_WARN("tsmf_gstreamer_entry: failed to assign pointer to the memory address - shmat()");
 			else
 			{
-				if (!mdecoder->disp)
-					mdecoder->disp = XOpenDisplay(NULL);
-
 				if (!mdecoder->subwin)
 				{
 					XLockDisplay(mdecoder->disp);
@@ -1065,7 +1137,7 @@ static BOOL tsmf_gstreamer_pipeline_build(TSMFGstreamerDecoder * mdecoder)
 	}
 	if (!mdecoder->outsink)
 	{
-		DEBUG_WARN("tsmf_gstreamer_pipeline_build: Failed to load xvimagesink plugin");
+		DEBUG_WARN("tsmf_gstreamer_pipeline_build: Failed to load xvimagesink or ximagesink plugin");
 		tsmf_gstreamer_clean_up(mdecoder, TRUE);
 		return FALSE;
 	}
