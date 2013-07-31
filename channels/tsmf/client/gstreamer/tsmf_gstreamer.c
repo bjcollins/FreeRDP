@@ -56,6 +56,10 @@
 #define TRY_DECODEBIN	0
 #define SEEK_TOLERANCE 10000000
 
+// For Debug - can be used to capture buffer streams to be played back outside of application
+#define AUDIOSAVESTREAM 0
+#define VIDEOSAVESTREAM 0
+
 typedef struct _TSMFGstreamerDecoder
 {
 	ITSMFDecoder iface;
@@ -876,177 +880,191 @@ static BOOL tsmf_gstreamer_pipeline_build(TSMFGstreamerDecoder * mdecoder)
 	BOOL hwaccelflu = FALSE;
 	BOOL hwaccelomx = FALSE;
 
-	switch (mdecoder->tsmf_media_type.SubType)
+	if ((mdecoder->media_type == TSMF_MAJOR_TYPE_AUDIO) && AUDIOSAVESTREAM)
 	{
-		case TSMF_SUB_TYPE_WMA1:
-			mdecoder->decbin = gst_element_factory_make ("fluwmadec", NULL);
-			DEBUG_DVC("tsmf_gstreamer_pipeline_build: WMA1");
-			break;
-		case TSMF_SUB_TYPE_WMA2:
-			mdecoder->decbin = gst_element_factory_make ("fluwmadec", NULL);
-			if (!mdecoder->decbin)
-				mdecoder->decbin = gst_element_factory_make ("ffdec_wmav2", NULL);
-			DEBUG_DVC("tsmf_gstreamer_pipeline_build: WMA2");
-			break;
-		case TSMF_SUB_TYPE_WMA9:
-			mdecoder->decbin = gst_element_factory_make ("fluwmadec", NULL);
-			if (!mdecoder->decbin)
-				mdecoder->decbin = gst_element_factory_make ("ffdec_wmapro", NULL);
-			DEBUG_DVC("tsmf_gstreamer_pipeline_build: WMA9 - WMA PRO version 3");
-			break;
-		case TSMF_SUB_TYPE_MP3:
-			mdecoder->decbin = gst_element_factory_make ("flump3dec", NULL);
-			DEBUG_DVC("tsmf_gstreamer_pipeline_build: MP3");
-			break;
-		case TSMF_SUB_TYPE_MP4S:
-			if (OMXavailable)
-			{
-				mdecoder->decbin = gst_element_factory_make ("omx_mpeg4dec", NULL);
-				if (mdecoder->decbin)
-				{
-					hwaccelomx = TRUE;
-				}
-			}
-			else
-				mdecoder->decbin = NULL;
+		mdecoder->decbin = gst_element_factory_make ("gdppay", NULL);
+		DEBUG_DVC("tsmf_gstreamer_pipeline_build: AUDIOSTREAM SAVE");
+	}
+	else if ((mdecoder->media_type == TSMF_MAJOR_TYPE_VIDEO) && VIDEOSAVESTREAM)
+	{
+		mdecoder->decbin = gst_element_factory_make ("gdppay", NULL);
+                DEBUG_DVC("tsmf_gstreamer_pipeline_build: VIDEOSTREAM SAVE");
+	}
 
-			if(!mdecoder->decbin)
+	else
+	{
+		switch (mdecoder->tsmf_media_type.SubType)
+		{
+			case TSMF_SUB_TYPE_WMA1:
+				mdecoder->decbin = gst_element_factory_make ("fluwmadec", NULL);
+				DEBUG_DVC("tsmf_gstreamer_pipeline_build: WMA1");
+				break;
+			case TSMF_SUB_TYPE_WMA2:
+				mdecoder->decbin = gst_element_factory_make ("fluwmadec", NULL);
+				if (!mdecoder->decbin)
+					mdecoder->decbin = gst_element_factory_make ("ffdec_wmav2", NULL);
+				DEBUG_DVC("tsmf_gstreamer_pipeline_build: WMA2");
+				break;
+			case TSMF_SUB_TYPE_WMA9:
+				mdecoder->decbin = gst_element_factory_make ("fluwmadec", NULL);
+				if (!mdecoder->decbin)
+					mdecoder->decbin = gst_element_factory_make ("ffdec_wmapro", NULL);
+				DEBUG_DVC("tsmf_gstreamer_pipeline_build: WMA9 - WMA PRO version 3");
+				break;
+			case TSMF_SUB_TYPE_MP3:
+				mdecoder->decbin = gst_element_factory_make ("flump3dec", NULL);
+				DEBUG_DVC("tsmf_gstreamer_pipeline_build: MP3");
+				break;
+			case TSMF_SUB_TYPE_MP4S:
+				if (OMXavailable)
+				{
+					mdecoder->decbin = gst_element_factory_make ("omx_mpeg4dec", NULL);
+					if (mdecoder->decbin)
+					{
+						hwaccelomx = TRUE;
+					}
+				}
+				else
+					mdecoder->decbin = NULL;
+
+				if(!mdecoder->decbin)
+					mdecoder->decbin = gst_element_factory_make ("flumpeg4vdec", NULL);
+				if(!mdecoder->decbin)
+					mdecoder->decbin = gst_element_factory_make ("ffdec_mpeg4", NULL);
+				DEBUG_DVC("tsmf_gstreamer_pipeline_build: MP4S");
+				break;
+			case TSMF_SUB_TYPE_MP42:
+				mdecoder->decbin = gst_element_factory_make ("fludivx3dec", NULL);
+				if(!mdecoder->decbin)
+					mdecoder->decbin = gst_element_factory_make ("ffdec_msmpeg4v2", NULL);
+				DEBUG_DVC("tsmf_gstreamer_pipeline_build: MP42");
+				break;
+			case TSMF_SUB_TYPE_MP43:
+				mdecoder->decbin = gst_element_factory_make ("fludivx3dec", NULL);
+                        	if(!mdecoder->decbin)
+					mdecoder->decbin = gst_element_factory_make ("ffdec_msmpeg4", NULL);
+				DEBUG_DVC("tsmf_gstreamer_pipeline_build: MP43");
+				break;
+			case TSMF_SUB_TYPE_M4S2:
 				mdecoder->decbin = gst_element_factory_make ("flumpeg4vdec", NULL);
-			if(!mdecoder->decbin)
-				mdecoder->decbin = gst_element_factory_make ("ffdec_mpeg4", NULL);
-			DEBUG_DVC("tsmf_gstreamer_pipeline_build: MP4S");
-			break;
-		case TSMF_SUB_TYPE_MP42:
-			mdecoder->decbin = gst_element_factory_make ("fludivx3dec", NULL);
-			if(!mdecoder->decbin)
-				mdecoder->decbin = gst_element_factory_make ("ffdec_msmpeg4v2", NULL);
-			DEBUG_DVC("tsmf_gstreamer_pipeline_build: MP42");
-			break;
-		case TSMF_SUB_TYPE_MP43:
-			mdecoder->decbin = gst_element_factory_make ("fludivx3dec", NULL);
-                        if(!mdecoder->decbin)
-				mdecoder->decbin = gst_element_factory_make ("ffdec_msmpeg4", NULL);
-			DEBUG_DVC("tsmf_gstreamer_pipeline_build: MP43");
-			break;
-		case TSMF_SUB_TYPE_M4S2:
-			mdecoder->decbin = gst_element_factory_make ("flumpeg4vdec", NULL);
-			if(!mdecoder->decbin)
-				mdecoder->decbin = gst_element_factory_make ("ffdec_msmpeg4", NULL);
-			DEBUG_DVC("tsmf_gstreamer_pipeline_build: M4S2");
-			break;
-		case TSMF_SUB_TYPE_MP2V:
-			if (OMXavailable)
-			{
-				mdecoder->decbin = gst_element_factory_make ("omx_mpeg2dec", NULL);
+				if(!mdecoder->decbin)
+					mdecoder->decbin = gst_element_factory_make ("ffdec_msmpeg4", NULL);
+				DEBUG_DVC("tsmf_gstreamer_pipeline_build: M4S2");
+				break;
+			case TSMF_SUB_TYPE_MP2V:
+				if (OMXavailable)
+				{
+					mdecoder->decbin = gst_element_factory_make ("omx_mpeg2dec", NULL);
+					if (mdecoder->decbin)
+					{
+						hwaccelomx = TRUE;
+					}
+				}
+				else
+					mdecoder->decbin = NULL;
+				if (!mdecoder->decbin)
+					mdecoder->decbin = gst_element_factory_make ("flumpeg2vdec", NULL);
+				if (!mdecoder->decbin)
+					mdecoder->decbin = gst_element_factory_make ("ffdec_mpeg2video", NULL);
+
+				DEBUG_DVC("tsmf_gstreamer_pipeline_build: MPEG2 Video");
+				break;
+			case TSMF_SUB_TYPE_WMV1:
+				mdecoder->decbin = gst_element_factory_make ("fluwmvdec", NULL);
+				if (!mdecoder->decbin)
+					mdecoder->decbin = gst_element_factory_make ("ffdec_wmv1", NULL);
+				DEBUG_DVC("tsmf_gstreamer_pipeline_build: WMV1");
+				break;
+			case TSMF_SUB_TYPE_WMV2:
+				mdecoder->decbin = gst_element_factory_make ("fluwmvdec", NULL);
+				if (!mdecoder->decbin)
+					mdecoder->decbin = gst_element_factory_make ("ffdec_wmv2", NULL);
+				DEBUG_DVC("tsmf_gstreamer_pipeline_build: WMV2");
+				break;
+			case TSMF_SUB_TYPE_WVC1:
+			case TSMF_SUB_TYPE_WMV3:
+				mdecoder->decbin = gst_element_factory_make ("fluvadec", NULL);
 				if (mdecoder->decbin)
 				{
-					hwaccelomx = TRUE;
+					hwaccelflu = TRUE;
 				}
-			}
-			else
-				mdecoder->decbin = NULL;
-			if (!mdecoder->decbin)
+				else
+				{
+					if (OMXavailable)
+					{
+						mdecoder->decbin = gst_element_factory_make ("omx_vc1dec", NULL);
+						if (mdecoder->decbin)
+							hwaccelomx = TRUE;
+					}
+					else
+						mdecoder->decbin = NULL;
+				}
+
+				if (!mdecoder->decbin)
+					mdecoder->decbin = gst_element_factory_make ("fluwmvdec", NULL);
+				if (!mdecoder->decbin)
+					mdecoder->decbin = gst_element_factory_make ("ffdec_wmv3", NULL);
+				DEBUG_DVC("tsmf_gstreamer_pipeline_build: WMV3");
+				break;
+			case TSMF_SUB_TYPE_AVC1:
+			case TSMF_SUB_TYPE_H264:
+				mdecoder->decbin = gst_element_factory_make ("fluvadec", NULL);
+				if (mdecoder->decbin)
+				{
+					hwaccelflu = TRUE;
+				}
+				else
+				{
+					if (OMXavailable)
+					{
+						mdecoder->decbin = gst_element_factory_make ("omx_h264dec", NULL);
+						if (mdecoder->decbin)
+							hwaccelomx = TRUE;
+					}
+					else
+						mdecoder->decbin = NULL;
+				}
+				if (!mdecoder->decbin)
+					mdecoder->decbin = gst_element_factory_make ("fluh264dec", NULL);
+
+				if (!mdecoder->decbin)
+					mdecoder->decbin = gst_element_factory_make ("ffdec_h264", NULL);
+				DEBUG_DVC("tsmf_gstreamer_pipeline_build: H264");
+				break;
+			case TSMF_SUB_TYPE_AC3:
+				mdecoder->decbin = gst_element_factory_make("fluac3dec", NULL);
+				if (!mdecoder->decbin)
+					mdecoder->decbin = gst_element_factory_make ("ffdec_ac3", NULL);
+				DEBUG_DVC("tsmf_gstreamer_pipeline_build: AC3");
+				break;
+			case TSMF_SUB_TYPE_AAC:
+				mdecoder->decbin = gst_element_factory_make ("fluaacdec", NULL);
+				if (!mdecoder->decbin)
+					mdecoder->decbin = gst_element_factory_make ("faad", NULL);
+				if (!mdecoder->decbin)
+					mdecoder->decbin = gst_element_factory_make ("ffdec_aac", NULL);
+				DEBUG_DVC("tsmf_gstreamer_pipeline_build: AAC");
+				break;
+			case TSMF_SUB_TYPE_MP2A:
+				mdecoder->decbin = gst_element_factory_make ("flump3dec", NULL);
+				if (!mdecoder->decbin)
+					mdecoder->decbin = gst_element_factory_make ("faad", NULL);
+				DEBUG_DVC("tsmf_gstreamer_pipeline_build: MP2A");
+				break;
+			case TSMF_SUB_TYPE_MP1A:
+				mdecoder->decbin = gst_element_factory_make ("flump3dec", NULL);
+				DEBUG_DVC("tsmf_gstreamer_pipeline_build: MP1A");
+				break;
+			case TSMF_SUB_TYPE_MP1V:
 				mdecoder->decbin = gst_element_factory_make ("flumpeg2vdec", NULL);
-			if (!mdecoder->decbin)
-				mdecoder->decbin = gst_element_factory_make ("ffdec_mpeg2video", NULL);
-
-			DEBUG_DVC("tsmf_gstreamer_pipeline_build: MPEG2 Video");
-			break;
-		case TSMF_SUB_TYPE_WMV1:
-			mdecoder->decbin = gst_element_factory_make ("fluwmvdec", NULL);
-			if (!mdecoder->decbin)
-				mdecoder->decbin = gst_element_factory_make ("ffdec_wmv1", NULL);
-			DEBUG_DVC("tsmf_gstreamer_pipeline_build: WMV1");
-			break;
-		case TSMF_SUB_TYPE_WMV2:
-			mdecoder->decbin = gst_element_factory_make ("fluwmvdec", NULL);
-			if (!mdecoder->decbin)
-				mdecoder->decbin = gst_element_factory_make ("ffdec_wmv2", NULL);
-			DEBUG_DVC("tsmf_gstreamer_pipeline_build: WMV2");
-			break;
-		case TSMF_SUB_TYPE_WVC1:
-		case TSMF_SUB_TYPE_WMV3:
-			mdecoder->decbin = gst_element_factory_make ("fluvadec", NULL);
-			if (mdecoder->decbin)
-			{
-				hwaccelflu = TRUE;
-			}
-			else
-			{
-				if (OMXavailable)
-				{
-					mdecoder->decbin = gst_element_factory_make ("omx_vc1dec", NULL);
-					if (mdecoder->decbin)
-						hwaccelomx = TRUE;
-				}
-				else
-					mdecoder->decbin = NULL;
-			}
-
-			if (!mdecoder->decbin)
-				mdecoder->decbin = gst_element_factory_make ("fluwmvdec", NULL);
-			if (!mdecoder->decbin)
-				mdecoder->decbin = gst_element_factory_make ("ffdec_wmv3", NULL);
-			DEBUG_DVC("tsmf_gstreamer_pipeline_build: WMV3");
-			break;
-		case TSMF_SUB_TYPE_AVC1:
-		case TSMF_SUB_TYPE_H264:
-			mdecoder->decbin = gst_element_factory_make ("fluvadec", NULL);
-			if (mdecoder->decbin)
-			{
-				hwaccelflu = TRUE;
-			}
-			else
-			{
-				if (OMXavailable)
-				{
-					mdecoder->decbin = gst_element_factory_make ("omx_h264dec", NULL);
-					if (mdecoder->decbin)
-						hwaccelomx = TRUE;
-				}
-				else
-					mdecoder->decbin = NULL;
-			}
-			if (!mdecoder->decbin)
-				mdecoder->decbin = gst_element_factory_make ("fluh264dec", NULL);
-
-			if (!mdecoder->decbin)
-				mdecoder->decbin = gst_element_factory_make ("ffdec_h264", NULL);
-			DEBUG_DVC("tsmf_gstreamer_pipeline_build: H264");
-			break;
-		case TSMF_SUB_TYPE_AC3:
-			mdecoder->decbin = gst_element_factory_make("fluac3dec", NULL);
-			if (!mdecoder->decbin)
-				mdecoder->decbin = gst_element_factory_make ("ffdec_ac3", NULL);
-			DEBUG_DVC("tsmf_gstreamer_pipeline_build: AC3");
-			break;
-		case TSMF_SUB_TYPE_AAC:
-			mdecoder->decbin = gst_element_factory_make ("fluaacdec", NULL);
-			if (!mdecoder->decbin)
-				mdecoder->decbin = gst_element_factory_make ("faad", NULL);
-			if (!mdecoder->decbin)
-				mdecoder->decbin = gst_element_factory_make ("ffdec_aac", NULL);
-			DEBUG_DVC("tsmf_gstreamer_pipeline_build: AAC");
-			break;
-		case TSMF_SUB_TYPE_MP2A:
-			mdecoder->decbin = gst_element_factory_make ("flump3dec", NULL);
-			if (!mdecoder->decbin)
-				mdecoder->decbin = gst_element_factory_make ("faad", NULL);
-			DEBUG_DVC("tsmf_gstreamer_pipeline_build: MP2A");
-			break;
-		case TSMF_SUB_TYPE_MP1A:
-			mdecoder->decbin = gst_element_factory_make ("flump3dec", NULL);
-			DEBUG_DVC("tsmf_gstreamer_pipeline_build: MP1A");
-			break;
-		case TSMF_SUB_TYPE_MP1V:
-			mdecoder->decbin = gst_element_factory_make ("flumpeg2vdec", NULL);
-			if (!mdecoder->decbin)
-				mdecoder->decbin = gst_element_factory_make ("ffdec_mpegvideo", NULL);
-			DEBUG_DVC("tsmf_gstreamer_pipeline_build: MP1V");
-			break;
-		default:
-			DEBUG_WARN("tsmf_gstreamer_pipeline_build: Unsupported media type %d", mdecoder->tsmf_media_type.SubType);
-			return FALSE;
+				if (!mdecoder->decbin)
+					mdecoder->decbin = gst_element_factory_make ("ffdec_mpegvideo", NULL);
+				DEBUG_DVC("tsmf_gstreamer_pipeline_build: MP1V");
+				break;
+			default:
+				DEBUG_WARN("tsmf_gstreamer_pipeline_build: Unsupported media type %d", mdecoder->tsmf_media_type.SubType);
+				return FALSE;
+		}
 	}
 	if (!mdecoder->decbin)
 	{
@@ -1061,9 +1079,18 @@ static BOOL tsmf_gstreamer_pipeline_build(TSMFGstreamerDecoder * mdecoder)
 			if (!mdecoder->disp)
 				mdecoder->disp = XOpenDisplay(NULL);
 
+			mdecoder->outbin = gst_bin_new ("videobin");
+
+			if (VIDEOSAVESTREAM)
+			{
+				mdecoder->outsink = gst_element_factory_make ("filesink", "videosink");
+				g_object_set(GST_OBJECT(mdecoder->outsink), "location", "videostream.gdp", NULL);
+				DEBUG_DVC("tsmf_gstreamer_pipeline_build: building Video Pipe SAVE STREAM");
+				break;                  
+			}
+
 			BOOL useXV = tsmf_gstreamer_pipeline_xv_available(mdecoder->disp);
 
-			mdecoder->outbin = gst_bin_new ("videobin");
 			if (hwaccelflu)
 			{
 				mdecoder->outconv = gst_element_factory_make ("queue", "queuetosink"); 
@@ -1113,6 +1140,15 @@ static BOOL tsmf_gstreamer_pipeline_build(TSMFGstreamerDecoder * mdecoder)
 		case TSMF_MAJOR_TYPE_AUDIO:
 		{
 			mdecoder->outbin = gst_bin_new ("audiobin"); 
+
+			if (AUDIOSAVESTREAM)
+			{
+				mdecoder->outsink = gst_element_factory_make ("filesink", "audiosink");
+				g_object_set(GST_OBJECT(mdecoder->outsink), "location", "audiostream.gdp", NULL);
+				DEBUG_DVC("tsmf_gstreamer_pipeline_build: building Audio Pipe SAVE STREAM");
+				break;  
+			}
+
 			mdecoder->outconv = gst_element_factory_make ("audioconvert", "aconv"); 
 			mdecoder->outsink = gst_element_factory_make ("alsasink", "audiosink"); 
 			mdecoder->aVolume = gst_element_factory_make ("volume", "aVolume");
@@ -1129,11 +1165,14 @@ static BOOL tsmf_gstreamer_pipeline_build(TSMFGstreamerDecoder * mdecoder)
 		default:
 		break;
 	}
-	if (!mdecoder->outconv)
+	if (((mdecoder->media_type == TSMF_MAJOR_TYPE_AUDIO) && !AUDIOSAVESTREAM) || ((mdecoder->media_type == TSMF_MAJOR_TYPE_VIDEO) && !VIDEOSAVESTREAM))
 	{
-		DEBUG_WARN("tsmf_gstreamer_pipeline_build: Failed to load media converter");
-		tsmf_gstreamer_clean_up(mdecoder, TRUE);
-		return FALSE;
+		if (!mdecoder->outconv)
+		{
+			DEBUG_WARN("tsmf_gstreamer_pipeline_build: Failed to load media converter");
+			tsmf_gstreamer_clean_up(mdecoder, TRUE);
+			return FALSE;
+		}
 	}
 	if (!mdecoder->outsink)
 	{
@@ -1163,51 +1202,66 @@ static BOOL tsmf_gstreamer_pipeline_build(TSMFGstreamerDecoder * mdecoder)
 
 	if (mdecoder->media_type == TSMF_MAJOR_TYPE_VIDEO)
 	{
-		gst_base_sink_set_max_lateness((GstBaseSink *) mdecoder->outsink, 40000000); //nanoseconds
+		if (!VIDEOSAVESTREAM)
+		{
+			gst_base_sink_set_max_lateness((GstBaseSink *) mdecoder->outsink, 40000000); //nanoseconds
+		}
 	}
 	else
 	{
-		g_object_set(G_OBJECT(mdecoder->outsink), "drift-tolerance", (gint64) 40000, NULL); //microseconds
-		g_object_set(G_OBJECT(mdecoder->outsink), "buffer-time", (gint64) 200000, NULL); //microseconds
-		g_object_set(G_OBJECT(mdecoder->outsink), "latency-time", (gint64) 10000, NULL); //microseconds
-		g_object_set(G_OBJECT(mdecoder->outsink), "slave-method", 1, NULL);
+		if (!AUDIOSAVESTREAM)
+		{
+			g_object_set(G_OBJECT(mdecoder->outsink), "drift-tolerance", (gint64) 40000, NULL); //microseconds
+			g_object_set(G_OBJECT(mdecoder->outsink), "buffer-time", (gint64) 200000, NULL); //microseconds
+			g_object_set(G_OBJECT(mdecoder->outsink), "latency-time", (gint64) 10000, NULL); //microseconds
+			g_object_set(G_OBJECT(mdecoder->outsink), "slave-method", 1, NULL);
+		}
 	}
-
-	out_pad = gst_element_get_static_pad(mdecoder->outconv, "sink");
 
 	gboolean linkResult = FALSE;
-	gst_bin_add(GST_BIN(mdecoder->outbin), mdecoder->outconv);
 	gst_bin_add(GST_BIN(mdecoder->outbin), mdecoder->outsink);
-	if (mdecoder->aVolume)
-	{
-		gst_bin_add(GST_BIN(mdecoder->outbin), mdecoder->aVolume);
 
-		if (mdecoder->aResample)
+	if (((mdecoder->media_type == TSMF_MAJOR_TYPE_AUDIO) && !AUDIOSAVESTREAM) || ((mdecoder->media_type == TSMF_MAJOR_TYPE_VIDEO) && !VIDEOSAVESTREAM))
+	{
+		out_pad = gst_element_get_static_pad(mdecoder->outconv, "sink");
+
+		gst_bin_add(GST_BIN(mdecoder->outbin), mdecoder->outconv);
+
+		if (mdecoder->aVolume)
 		{
-			gst_bin_add(GST_BIN(mdecoder->outbin), mdecoder->aResample);
-			linkResult = gst_element_link_many(mdecoder->outconv, mdecoder->aResample, mdecoder->aVolume, mdecoder->outsink, NULL);
+			gst_bin_add(GST_BIN(mdecoder->outbin), mdecoder->aVolume);
+
+			if (mdecoder->aResample)
+			{
+				gst_bin_add(GST_BIN(mdecoder->outbin), mdecoder->aResample);
+				linkResult = gst_element_link_many(mdecoder->outconv, mdecoder->aResample, mdecoder->aVolume, mdecoder->outsink, NULL);
+			}
+			else
+				linkResult = gst_element_link_many(mdecoder->outconv, mdecoder->aVolume, mdecoder->outsink, NULL);
+		}
+		else if (mdecoder->vidscale)
+		{
+			gst_bin_add(GST_BIN(mdecoder->outbin), mdecoder->vidscale);
+			linkResult = gst_element_link_many(mdecoder->outconv, mdecoder->vidscale, mdecoder->outsink, NULL);
 		}
 		else
-			linkResult = gst_element_link_many(mdecoder->outconv, mdecoder->aVolume, mdecoder->outsink, NULL);
-	}
-	else if (mdecoder->vidscale)
-	{
-		gst_bin_add(GST_BIN(mdecoder->outbin), mdecoder->vidscale);
-		linkResult = gst_element_link_many(mdecoder->outconv, mdecoder->vidscale, mdecoder->outsink, NULL);
+		{
+			linkResult = gst_element_link(mdecoder->outconv, mdecoder->outsink);
+		}
+		if (!linkResult)
+		{
+			DEBUG_WARN("tsmf_gstreamer_pipeline_build: Failed to link these elements: converter->sink");
+			tsmf_gstreamer_clean_up(mdecoder, TRUE);
+			return FALSE;
+		}
+
+		gst_element_add_pad(mdecoder->outbin, gst_ghost_pad_new ("sink", out_pad));
 	}
 	else
 	{
-		linkResult = gst_element_link(mdecoder->outconv, mdecoder->outsink);
+		out_pad = gst_element_get_static_pad(mdecoder->outsink, "sink");
+		gst_element_add_pad(mdecoder->outbin, gst_ghost_pad_new ("sink", out_pad));
 	}
-	if (!linkResult)
-	{
-		DEBUG_WARN("tsmf_gstreamer_pipeline_build: Failed to link these elements: converter->sink");
-		tsmf_gstreamer_clean_up(mdecoder, TRUE);
-		return FALSE;
-	}
-
-	gst_element_add_pad(mdecoder->outbin, gst_ghost_pad_new ("sink", out_pad));
-	gst_object_unref(out_pad);
 
 	gst_bin_add(GST_BIN(mdecoder->pipe), mdecoder->src);
 	gst_bin_add(GST_BIN(mdecoder->pipe), mdecoder->queue);
